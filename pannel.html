@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Weapon Panel</title>
+
+<style>
+body{
+    margin:0;
+    overflow:hidden;
+    font-family:Arial;
+    color:white;
+    background:black;
+}
+
+/* MATRIX */
+#matrix{
+    position:fixed;
+    inset:0;
+    z-index:-1;
+}
+
+/* OPEN BTN */
+.open-btn{
+    position:absolute;
+    top:15px;
+    left:50%;
+    transform:translateX(-50%);
+    padding:12px 40px;
+    border:none;
+    border-radius:30px;
+    background:#2ecc71;
+    color:white;
+    cursor:pointer;
+}
+
+/* PANELS */
+.left-panel{
+    position:fixed;
+    left:-240px;
+    top:70px;
+    width:220px;
+    height:100%;
+    padding:10px;
+    background:rgba(0,0,0,.7);
+    transition:.4s;
+}
+.left-panel.open{left:0;}
+
+.right-panel{
+    position:fixed;
+    right:-320px;
+    top:70px;
+    width:300px;
+    height:100%;
+    padding:15px;
+    background:rgba(0,0,0,.7);
+    transition:.4s;
+}
+.right-panel.open{right:0;}
+
+.item{
+    background:rgba(255,255,255,.1);
+    margin:8px 0;
+    padding:10px;
+    border-radius:6px;
+    cursor:pointer;
+    text-align:center;
+}
+
+/* DISPLAY BOX */
+.display{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    width:420px;
+    height:260px;
+    border:2px solid #00ff88;
+    padding:15px;
+    box-sizing:border-box;
+}
+
+.display h3{
+    margin-top:0;
+    text-align:center;
+}
+
+.display ul{
+    list-style:none;
+    padding:0;
+    margin:0;
+}
+
+.display li{
+    margin:6px 0;
+    color:#00ff88;
+}
+
+/* LOADING RECTANGLE */
+.loader-box{
+    position:absolute;
+    bottom:10px;
+    right:10px;
+    width:120px;
+    height:8px;
+    background:#111;
+    display:none;
+}
+.loader-bar{
+    height:100%;
+    width:0%;
+    background:#00ff88;
+}
+
+/* SLIDER */
+.slider{width:100%}
+
+/* BUTTONS */
+.action-btn{
+    margin-top:10px;
+    padding:10px;
+    border:none;
+    border-radius:20px;
+    cursor:pointer;
+    color:white;
+    width:100%;
+}
+.activate{background:#2ecc71;}
+.deactivate{background:#c0392b;}
+
+/* ===== STARTUP LOADING ===== */
+#startupLoading{
+    position:fixed;
+    inset:0;
+    background:black;
+    z-index:9999;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+}
+
+#startupLoading h1{
+    color:#00ff88;
+    font-size:42px;
+    letter-spacing:4px;
+    animation:glitch 0.9s infinite;
+}
+
+@keyframes glitch{
+    0%{transform:translate(0)}
+    20%{transform:translate(-2px,2px)}
+    40%{transform:translate(2px,-2px)}
+    60%{transform:translate(-2px,-2px)}
+    80%{transform:translate(2px,2px)}
+    100%{transform:translate(0)}
+}
+
+.startup-bar{
+    margin-top:25px;
+    width:260px;
+    height:8px;
+    background:#111;
+    overflow:hidden;
+}
+.startup-bar span{
+    display:block;
+    height:100%;
+    width:0%;
+    background:#00ff88;
+    animation:startupLoad 4s linear forwards;
+}
+
+@keyframes startupLoad{
+    to{width:100%}
+}
+</style>
+</head>
+
+<body>
+
+<!-- STARTUP LOADING SCREEN -->
+<div id="startupLoading">
+    <h1>YAKTHUMBA PANEL</h1>
+    <div class="startup-bar"><span></span></div>
+</div>
+
+<canvas id="matrix"></canvas>
+
+<button class="open-btn" onclick="toggle()">OPEN PANEL</button>
+
+<div class="left-panel" id="leftPanel">
+    <div class="item" onclick="selectWeapon('AWM')">AWM</div>
+    <div class="item" onclick="selectWeapon('UMP')">UMP</div>
+    <div class="item" onclick="selectWeapon('AK-47')">AK-47</div>
+    <div class="item" onclick="selectWeapon('MP40')">MP40</div>
+    <div class="item" onclick="openMarksman()">Marksman Rifle</div>
+</div>
+
+<div class="right-panel" id="rightPanel">
+    <div id="weaponList"></div>
+
+    <div id="rateBox" style="display:none;">
+        <p>Headshot Rate</p>
+        <input type="range" min="30" max="100" value="50"
+               class="slider" oninput="updateRate(this.value)">
+        <p id="rateText">50%</p>
+    </div>
+
+    <button class="action-btn activate" onclick="activate()">Activate</button>
+    <button class="action-btn deactivate" onclick="deactivate()">Deactivate</button>
+</div>
+
+<div class="display">
+    <h3>Status</h3>
+    <ul id="displayList">
+        <li>No Feature Activated</li>
+    </ul>
+
+    <div class="loader-box" id="loaderBox">
+        <div class="loader-bar" id="loaderBar"></div>
+    </div>
+</div>
+
+<script>
+/* MATRIX EFFECT */
+const c=document.getElementById("matrix");
+const ctx=c.getContext("2d");
+c.width=innerWidth; c.height=innerHeight;
+const letters="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const drops=Array(Math.floor(c.width/14)).fill(1);
+
+setInterval(()=>{
+    ctx.fillStyle="rgba(0,0,0,.05)";
+    ctx.fillRect(0,0,c.width,c.height);
+    ctx.fillStyle="#00ff88";
+    ctx.font="14px monospace";
+    drops.forEach((y,i)=>{
+        ctx.fillText(letters[Math.random()*letters.length|0],i*14,y*14);
+        drops[i]=y*14>c.height?0:y+1;
+    });
+},40);
+
+/* ================= CONNECTION LOGIC ================= */
+let isConnected=false;
+let connecting=false;
+let selected=null;
+let rates={};
+let active={};
+
+function toggle(){
+    if(connecting) return;
+    if(!isConnected){
+        connecting=true;
+        showStatus("Connecting to device...");
+        loader(true);
+        setTimeout(()=>{
+            loader(false);
+            showStatus("Device Connected");
+            isConnected=true;
+            connecting=false;
+            leftPanel.classList.add("open");
+        },8000);
+    }else{
+        connecting=true;
+        showStatus("Disconnecting device...");
+        loader(true);
+        setTimeout(()=>{
+            loader(false);
+            showStatus("Device Disconnected");
+            isConnected=false;
+            connecting=false;
+            leftPanel.classList.remove("open");
+            rightPanel.classList.remove("open");
+            rateBox.style.display="none";
+            selected=null;
+            active={};
+        },6000);
+    }
+}
+
+function showStatus(text){
+    displayList.innerHTML=`<li>${text}</li>`;
+}
+
+function selectWeapon(name){
+    if(!isConnected) return;
+    selected=name;
+    rightPanel.classList.add("open");
+    rateBox.style.display="block";
+    const r=rates[name]??50;
+    document.querySelector(".slider").value=r;
+    rateText.innerText=r+"%";
+}
+
+function openMarksman(){
+    weaponList.innerHTML=`
+        <div class="item" onclick="selectWeapon('M14')">M14</div>
+        <div class="item" onclick="selectWeapon('SKS')">SKS</div>
+        <div class="item" onclick="selectWeapon('SVD')">SVD</div>
+        <div class="item" onclick="selectWeapon('AC80')">AC80</div>
+    `;
+}
+
+function updateRate(v){
+    rates[selected]=v;
+    rateText.innerText=v+"%";
+}
+
+function activate(){
+    if(!selected) return;
+    loader(true);
+    setTimeout(()=>{
+        active[selected]=rates[selected]??50;
+        render();
+        loader(false);
+    },3000);
+}
+
+function deactivate(){
+    if(Object.keys(active).length===0){
+        render();
+        return;
+    }
+    loader(true);
+    setTimeout(()=>{
+        active={};
+        render();
+        loader(false);
+    },5000);
+}
+
+function render(){
+    displayList.innerHTML="";
+    const keys=Object.keys(active);
+    if(keys.length===0){
+        displayList.innerHTML="<li>No Feature Activated</li>";
+        return;
+    }
+    keys.forEach(w=>{
+        displayList.innerHTML+=`<li>${w} – Headshot ${active[w]}%</li>`;
+    });
+}
+
+function loader(show){
+    loaderBox.style.display=show?"block":"none";
+    loaderBar.style.width="0%";
+    if(show){
+        let p=0;
+        const i=setInterval(()=>{
+            p+=4;
+            loaderBar.style.width=p+"%";
+            if(p>=100) clearInterval(i);
+        },120);
+    }
+}
+
+/* REMOVE STARTUP SCREEN */
+window.addEventListener("load",()=>{
+    setTimeout(()=>{
+        document.getElementById("startupLoading").style.display="none";
+    },4000);
+});
+</script>
+
+</body>
+</html>
